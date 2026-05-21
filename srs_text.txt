@@ -1,0 +1,638 @@
+
+
+--- PAGE 1 ---
+                                              
+ 
+ 
+ESPECIFICACION DE REQUERIMIENTOS DE 
+SOFTWARE 
+SRS — AgendaBarber v2.0 
+Sistema de Gestion de Citas con Agente IA para Barberias 
+ 
+Version 2.0 — Mayo 2026 
+Estandar IEEE 830 
+Stack gratuito — Fase de validacion con barberias piloto 
+ 
+ 
+  
+
+--- PAGE 2 ---
+1. Introduccion 
+ 
+1.1 Proposito 
+El presente documento describe los requerimientos de software para AgendaBarber, una 
+plataforma SaaS orientada a la gestion automatizada de citas para barberias. El sistema integra 
+un agente inteligente de WhatsApp basado en Groq API con el modelo Llama 3.1, y una pagina 
+web en Next.js, permitiendo que los clientes agenden, confirmen y cancelen citas de forma 
+autonoma mientras el negocio gestiona su operacion desde un panel en tiempo real. 
+ 
+1.2 Alcance 
+AgendaBarber V2.0 — Stack gratuito cubre: 
+• Agente conversacional en WhatsApp mediante Baileys (libreria open source) 
+• Agendado de citas desde pagina web en Next.js desplegada en Vercel 
+• Motor de tiempos con tolerancia de 10 minutos y recordatorios automaticos 
+• Dashboard operativo en tiempo real con Socket.io 
+• Gestion de multiples barberos (1 a 5) por negocio 
+• Base de datos PostgreSQL via Supabase (gratis hasta 500MB) 
+• Cola de jobs con Upstash Redis (gratis hasta 10,000 comandos/dia) 
+• Arquitectura multi-tenant: cada barberia opera en su propio espacio de datos 
+ 
+1.3 Glosario 
+Termino Descripcion 
+SRS Software Requirements Specification — Especificacion de 
+Requerimientos de Software 
+SaaS Software as a Service — Software como Servicio con modelo de 
+suscripcion mensual 
+Baileys Libreria open source de Node.js que conecta WhatsApp sin costo 
+mediante sesion activa 
+Groq API API gratuita de inferencia de IA que provee acceso al modelo Llama 
+3.1 
+Llama 3.1 Modelo de lenguaje open source de Meta, usado como motor del 
+agente conversacional 
+Supabase Plataforma gratuita que provee PostgreSQL como servicio con hasta 
+500MB de almacenamiento 
+Upstash Redis Servicio gratuito de Redis para cache y cola de jobs (hasta 10,000 
+cmd/dia) 
+Vercel Plataforma gratuita de deploy para aplicaciones Next.js 
+
+--- PAGE 3 ---
+Termino Descripcion 
+Oracle Cloud Free Infraestructura gratuita permanente con 2 VMs de 1GB RAM para el 
+backend 
+Bull Queue Libreria de Node.js para gestion de jobs asincronos sobre Redis 
+Socket.io Libreria para comunicacion en tiempo real entre backend y 
+dashboard 
+Motor de tiempos Componente que gestiona tolerancias, cronometros y cancelaciones 
+automaticas 
+Multi-tenant Arquitectura donde multiples negocios comparten el sistema con 
+datos aislados 
+JWT JSON Web Token — estandar para autenticacion sin estado entre 
+cliente y servidor 
+Walk-in Cliente que llega al local sin cita previa y es registrado manualmente 
+ 
+1.4 Version del documento 
+Version Fecha Descripcion 
+1.0 Mayo 2026 Version inicial del SRS 
+2.0 Mayo 2026 Actualizacion post-analisis del prototipo. Stack 100% gratuito. 
+Arquitectura definida. Correcciones de flujo. 
+ 
+  
+
+--- PAGE 4 ---
+2. Descripcion General del Sistema  
+ 
+2.1 Perspectiva del producto 
+AgendaBarber es un sistema independiente multi-tenant que opera como SaaS. Cada barberia 
+registrada tiene su propio espacio de datos aislado identificado por id_negocio. El sistema se 
+compone de tres interfaces: el agente de WhatsApp (Baileys + Groq), la pagina web del cliente 
+(Next.js en Vercel) y el dashboard del negocio (Next.js en Vercel). El backend corre en Node.js 
+sobre Oracle Cloud Free y se conecta a Supabase (PostgreSQL) y Upstash Redis. 
+ 
+2.2 Arquitectura del sistema 
+Capa Tecnologia Costo 
+Clientes — WhatsApp Baileys (libreria open source Node.js) Gratis 
+Clientes — Web y 
+Dashboard 
+Next.js desplegado en Vercel Gratis 
+API Gateway Express middleware — JWT propio, rate 
+limiting 
+Gratis 
+Backend — Servicios Node.js + Express en Oracle Cloud Free 
+Tier 
+Gratis 
+Agente IA Groq API con modelo Llama 3.1 Gratis (limite generoso) 
+Base de datos Supabase — PostgreSQL Gratis hasta 500MB 
+Cache y Jobs Upstash Redis + Bull Queue Gratis hasta 10k cmd/dia 
+Tiempo real Socket.io Gratis (open source) 
+Autenticacion JWT + bcrypt propios Gratis (open source) 
+Migracion futura Meta Cloud API + Claude API (cuando haya 
+ingresos SaaS) 
+Pago 
+ 
+2.3 Roles del sistema 
+Rol Descripcion Acceso 
+Administrador Dueño o encargado del negocio. Acceso total al 
+dashboard. 
+Total 
+Barbero / 
+Recepcionista 
+Personal operativo. Confirma llegadas e inicia 
+servicios desde el dashboard. 
+Operativo 
+Cliente Agenda, confirma y cancela citas via WhatsApp o 
+pagina web. 
+Publico 
+ 
+
+--- PAGE 5 ---
+2.4 Modelo de negocio SaaS 
+Plan Precio/mes Barberos Citas/mes Reportes 
+Basico $299 MXN 1 Hasta 100 No 
+Profesional $599 MXN Hasta 3 Ilimitadas Si 
+Premium $999 MXN Hasta 5 Ilimitadas Si — avanzados 
+ 
+2.5 Restricciones del sistema V2.0 
+• No existe aplicacion movil en esta version 
+• Baileys requiere un telefono con WhatsApp activo conectado al servidor 
+• Supabase limita el almacenamiento gratuito a 500MB — suficiente para fase piloto 
+• Upstash Redis limita a 10,000 comandos diarios — suficiente para hasta 30 negocios 
+• La configuracion de servicios, precios y asignacion de barberos es pendiente para V3.0 
+• No se procesan pagos en linea en esta version 
+ 
+  
+
+--- PAGE 6 ---
+3. Requerimientos Funcionales  
+ 
+3.1 Modulo de autenticacion y roles 
+ 
+RF-01 Registro de negocio 
+El sistema debe permitir que una barberia se registre proporcionando nombre del negocio, 
+correo electronico, contrasena y seleccion de plan. La contrasena debe almacenarse con hash 
+bcrypt. Al completar el registro se crea automaticamente el perfil de administrador. 
+ 
+RF-02 Inicio de sesion 
+El sistema debe autenticar a Administrador y Barbero mediante correo y contrasena. Tras la 
+autenticacion exitosa se genera un JWT con duracion de 8 horas. El token debe enviarse en el 
+header Authorization de cada peticion al backend. 
+ 
+RF-03 Control de acceso por rol  
+El API Gateway debe validar el JWT en cada peticion. El rol Barbero / Recepcionista solo 
+puede acceder al dashboard operativo del dia. El rol Administrador tiene acceso total 
+incluyendo clientes, reportes y configuracion. 
+ 
+3.2 Modulo de agendado — Canal WhatsApp 
+ 
+RF-04 Conexion via Baileys 
+El sistema debe mantener una sesion activa de WhatsApp mediante Baileys. La sesion debe 
+persistirse en disco para sobrevivir reinicios del servidor. El sistema debe reconectar 
+automaticamente si la sesion se interrumpe. 
+ 
+RF-05 Flujo conversacional del agente  
+El agente debe guiar al cliente para agendar una cita en no mas de 5 mensajes siguiendo este 
+flujo: saludo y pregunta del servicio, consulta de disponibilidad, presentacion de horarios 
+disponibles, solicitud de nombre y apellido, confirmacion del registro. El numero de telefono se 
+toma automaticamente del chat de WhatsApp sin pedirlo al cliente. 
+ 
+RF-06 Motor de lenguaje natural con Groq API  
+El agente debe usar Groq API con el modelo Llama 3.1 para interpretar mensajes en lenguaje 
+natural. El sistema debe construir un prompt con el contexto del negocio (servicios, horarios, 
+disponibilidad del dia) y el historial de la conversacion almacenado en Upstash Redis. La 
+respuesta de Groq debe incluir el texto para el cliente y la accion estructurada a ejecutar. 
+
+--- PAGE 7 ---
+ 
+RF-07 Persistencia del contexto conversacional  
+El sistema debe almacenar el historial de cada conversacion activa en Upstash Redis con una 
+clave por numero de telefono. El contexto debe expirar automaticamente tras 30 minutos de 
+inactividad para liberar memoria. 
+ 
+3.3 Modulo de agendado — Canal web 
+ 
+RF-08 Calendario de disponibilidad  
+La pagina web debe mostrar un calendario visual con los dias disponibles del mes en curso. Al 
+seleccionar un dia, debe mostrar los horarios libres calculados en tiempo real desde la base de 
+datos, descontando la duracion de cada servicio para evitar traslapes. 
+ 
+RF-09 Formulario de agendado  
+El formulario debe solicitar nombre, apellido, numero de telefono, servicio deseado, fecha y 
+hora. Al confirmar, el sistema debe registrar la cita en la base de datos y notificar al negocio via 
+Socket.io para actualizar el dashboard en tiempo real. 
+ 
+RF-10 Sincronizacion entre canales  
+Ambos canales deben compartir la misma base de datos en Supabase. Si un horario se ocupa 
+por WhatsApp, la pagina web debe reflejarlo de inmediato. El sistema debe prevenir doble 
+reserva mediante una transaccion atomica en PostgreSQL al momento de guardar la cita. 
+ 
+3.4 Cancelacion de citas 
+ 
+RF-11 Cancelacion por WhatsApp  
+El agente debe detectar la intencion de cancelar y solicitar confirmacion con la pregunta: Estas 
+seguro que deseas cancelar tu cita del [fecha] a las [hora]? Si el cliente responde SI, el sistema 
+cancela la cita y libera el horario. Si responde NO, la cita permanece activa. 
+ 
+RF-12 Cancelacion desde pagina web  
+La pagina web debe mostrar un modal de confirmacion antes de procesar la cancelacion. El 
+modal debe mostrar los detalles de la cita y dos botones: Cancelar cita y Mantener cita. Solo al 
+confirmar se ejecuta la cancelacion en la base de datos. 
+ 
+RF-13 Cancelacion por el negocio  
+
+--- PAGE 8 ---
+El Administrador o Barbero debe poder cancelar una cita desde el dashboard. El sistema debe 
+notificar automaticamente al cliente por WhatsApp indicando que su cita fue cancelada. 
+ 
+3.5 Motor de tiempos 
+ 
+RF-14 Job de tolerancia de 10 minutos  
+Al registrar una cita, el sistema debe programar automaticamente un job en Bull Queue con un 
+delay igual al tiempo hasta la hora de la cita mas 10 minutos. Cuando el job se ejecuta, si la cita 
+no ha cambiado al estado Cliente llego, el sistema debe cambiarla automaticamente a No 
+asistio y liberar el horario. 
+ 
+RF-15 Aviso previo al vencimiento  
+El sistema debe programar un segundo job que se ejecute 2 minutos antes de cumplirse la 
+tolerancia. Este job debe enviar una notificacion push via Socket.io al dashboard del negocio 
+indicando el nombre del cliente y los minutos restantes para la cancelacion automatica. 
+ 
+RF-16 Cronometro de servicio  
+Cuando el personal confirma la llegada del cliente en el dashboard, el sistema debe registrar la 
+hora exacta de llegada en la base de datos e iniciar un cronometro en tiempo real via Socket.io. 
+El cronometro debe mostrarse en el dashboard hasta que el servicio sea marcado como 
+completado. 
+ 
+RF-17 Calculo de retraso acumulado  
+Si el cliente llega despues de su hora agendada pero dentro del periodo de tolerancia, el 
+sistema debe calcular el retraso en minutos y notificar automaticamente por WhatsApp al 
+siguiente cliente en la agenda indicando la espera aproximada. 
+ 
+RF-18 Liberacion de horario para walk -in 
+Cuando una cita es cancelada automaticamente por no asistencia, el sistema debe marcar ese 
+horario como Disponible — entrada directa en el dashboard, permitiendo al personal registrar 
+manualmente a un cliente walk-in. 
+ 
+RF-19 Lista de espera 
+Si un cliente solicita un horario ocupado, el agente debe ofrecer agregarlo a la lista de espera. 
+Al liberarse ese horario por cancelacion o no asistencia, el sistema debe notificar 
+automaticamente al primer cliente en la lista. 
+ 
+ 
+
+--- PAGE 9 ---
+3.6 Ciclo de vida de la cita 
+ 
+El sistema debe gestionar los siguientes estados para cada cita: 
+Estado Descripcion Quien lo activa 
+Agendada Cita registrada. Estado inicial al crear 
+desde cualquier canal. 
+Sistema automatico 
+Confirmada Cliente confirmo asistencia respondiendo 
+SI al recordatorio de 24h. 
+Cliente via WhatsApp 
+Cliente llego Personal confirmo la llegada fisica. Inicia 
+cronometro. 
+Barbero en dashboard 
+En servicio Servicio iniciado. Cronometro corriendo en 
+tiempo real. 
+Barbero en dashboard 
+Completada Servicio finalizado. Se envia mensaje de 
+agradecimiento al cliente. 
+Barbero en dashboard 
+Cancelada Cancelada por cliente o por el negocio 
+antes del servicio. 
+Cliente o negocio 
+No asistio Cliente no llego en los 10 minutos de 
+tolerancia. Job automatico. 
+Sistema — Bull Queue 
+ 
+3.7 Modulo de notificaciones automaticas 
+ 
+RF-20 Recordatorio 24 horas antes  
+El sistema debe programar un job en Bull Queue al momento de crear cada cita. El job debe 
+ejecutarse 24 horas antes de la hora agendada y enviar un mensaje de WhatsApp al cliente 
+con los detalles de su cita preguntando si confirma su asistencia. 
+ 
+RF-21 Procesamiento de confirmacion  
+Si el cliente responde SI al recordatorio, la cita cambia al estado Confirmada. Si responde NO, 
+la cita se cancela automaticamente y el horario queda libre. Cualquier otra respuesta debe ser 
+procesada por el agente IA para interpretar la intencion. 
+ 
+RF-22 Mensaje de agradecimiento  
+Al marcar una cita como Completada, el sistema debe enviar automaticamente un mensaje de 
+WhatsApp al cliente agradeciendo su visita e invitandolo a agendar su proxima cita con un 
+enlace directo a la pagina web del negocio. 
+ 
+RF-23 Aviso de espera al siguiente cliente  
+
+--- PAGE 10 ---
+Cuando existe retraso acumulado, el sistema debe enviar un mensaje de WhatsApp al 
+siguiente cliente en agenda indicando el tiempo estimado de espera antes de su cita. 
+ 
+3.8 Panel de administracion — Dashboard 
+ 
+RF-24 Vista en tiempo real  
+El dashboard debe mostrar todas las citas del dia actualizadas en tiempo real via Socket.io sin 
+necesidad de recargar la pagina. Cada cita debe mostrar: hora, nombre y apellido del cliente, 
+telefono, servicio, barbero asignado, estado actual y cronometro activo cuando el servicio este 
+en curso. 
+ 
+RF-25 Acciones rapidas por cita  
+El personal debe poder ejecutar las siguientes acciones con un solo clic desde el dashboard: 
+confirmar llegada del cliente, iniciar servicio, completar servicio y marcar como no asistio. 
+ 
+RF-26 Horarios libres y walk-in 
+El dashboard debe calcular y mostrar dinamicamente los horarios libres del dia basandose en 
+las citas activas reales, no en valores estaticos. El personal debe poder registrar un cliente 
+walk-in desde un modal que solicita nombre, apellido y servicio. 
+ 
+RF-27 Registro de walk-in 
+El sistema debe registrar al cliente walk-in con estado inicial Cliente llego, asignarle el horario 
+actual del sistema como hora de cita e iniciar el cronometro de servicio inmediatamente. 
+ 
+3.9 Modulo de gestion de clientes 
+ 
+RF-28 Registro automatico de cliente  
+Al agendar una cita por primera vez, el sistema debe registrar automaticamente al cliente en la 
+tabla clientes usando el numero de telefono como identificador unico por negocio. Si el cliente 
+ya existe, se asocia la nueva cita a su perfil sin volver a pedirle los datos. 
+ 
+RF-29 Historial por cliente 
+El Administrador debe poder consultar el historial completo de citas de cada cliente, incluyendo 
+fechas, servicios, estados, puntualidad y numero total de inasistencias. 
+ 
+3.10 Modulo de reportes 
+
+--- PAGE 11 ---
+ 
+RF-30 Reporte de citas por periodo  
+El sistema debe generar reportes filtrados por dia, semana o mes con datos reales de la base 
+de datos, mostrando totales de citas agendadas, completadas, canceladas y no asistidas. 
+ 
+RF-31 Reporte de puntualidad  
+El sistema debe calcular el porcentaje de clientes puntuales, tardios dentro de tolerancia y no 
+asistidos, usando la diferencia entre hora_agendada y hora_llegada registrada en la base de 
+datos. 
+ 
+RF-32 Reporte de servicios populares  
+El sistema debe mostrar los servicios mas solicitados en un periodo dado, agrupando por 
+id_servicio y contando las citas en estado Completada. 
+ 
+  
+
+--- PAGE 12 ---
+4. Requerimientos No Funcionales  
+ 
+4.1 Rendimiento 
+• El agente de WhatsApp debe responder al cliente en menos de 3 segundos 
+• Las consultas de disponibilidad deben resolverse en menos de 2 segundos 
+• El dashboard debe actualizarse en tiempo real con latencia maxima de 1 segundo via 
+Socket.io 
+• Groq API con Llama 3.1 ofrece inferencia rapida adecuada para el tiempo de respuesta 
+requerido 
+ 
+4.2 Disponibilidad 
+• El sistema debe tener disponibilidad minima del 99% mensual 
+• La sesion de Baileys debe reconectarse automaticamente ante interrupciones 
+• Los jobs de Bull Queue deben persistir en Upstash Redis y reejecutarse si el servidor 
+reinicia 
+ 
+4.3 Seguridad 
+• Las contrasenas deben almacenarse con hash bcrypt (factor de costo minimo 10) 
+• Toda comunicacion entre cliente y servidor debe realizarse sobre HTTPS 
+• El JWT debe incluir id_negocio para garantizar aislamiento de datos multi-tenant 
+• Cada query a la base de datos debe filtrar obligatoriamente por id_negocio 
+• La sesion de Baileys debe almacenarse en disco con permisos restringidos al proceso 
+del servidor 
+ 
+4.4 Usabilidad 
+• El flujo de agendado por WhatsApp no debe requerir mas de 5 mensajes del cliente 
+• El formulario web debe completarse en menos de 2 minutos 
+• El dashboard debe ser operable sin capacitacion tecnica por parte del personal 
+• Las acciones del dashboard (Llego, Iniciar, Completar) deben ejecutarse con un solo 
+clic 
+ 
+4.5 Escalabilidad 
+• La arquitectura multi-tenant permite agregar nuevos negocios sin cambios en el codigo 
+• Al superar los limites gratuitos (Supabase 500MB, Upstash 10k cmd/dia) la migracion a 
+planes pagos debe ser transparente para el sistema 
+• Cuando los ingresos del SaaS lo justifiquen, Baileys se migra a Meta Cloud API y Groq 
+a Claude API sin rediseno del nucleo 
+ 
+
+--- PAGE 13 ---
+4.6 Compatibilidad 
+• La pagina web y el dashboard deben ser compatibles con Chrome, Firefox, Safari y 
+Edge modernos 
+• No se requiere aplicacion movil en esta version 
+ 
+  
+
+--- PAGE 14 ---
+5. Modelo de Datos 
+ 
+5.1 Entidades principales 
+ 
+Negocio 
+Campo Tipo Descripcion 
+id_negocio SERIAL PK Identificador unico del negocio 
+nombre VARCHAR(100) Nombre de la barberia 
+correo VARCHAR(150) 
+UNIQUE 
+Correo del administrador 
+contrasena_hash VARCHAR(255) Contraseña cifrada con bcrypt 
+plan ENUM basico, profesional, premium 
+whatsapp_session TEXT Datos de sesion de Baileys serializados 
+activo BOOLEAN Estado de la suscripcion 
+fecha_registro TIMESTAMPTZ Fecha de alta en el sistema 
+ 
+Barbero 
+Campo Tipo Descripcion 
+id_barbero SERIAL PK Identificador unico del barbero 
+id_negocio INT FK Negocio al que pertenece 
+nombre VARCHAR(100) Nombre del barbero 
+apellido VARCHAR(100) Apellido del barbero 
+rol ENUM administrador, barbero 
+correo VARCHAR(150) Correo para login al dashboard 
+contrasena_hash VARCHAR(255) Contrasena cifrada con bcrypt 
+activo BOOLEAN Si el barbero esta activo 
+ 
+ 
+ 
+ 
+ 
+ 
+
+--- PAGE 15 ---
+Cliente 
+Campo Tipo Descripcion 
+id_cliente SERIAL PK Identificador unico del cliente 
+id_negocio INT FK Negocio al que pertenece el cliente 
+nombre VARCHAR(100) Nombre del cliente 
+apellido VARCHAR(100) Apellido del cliente 
+telefono VARCHAR(20) Numero de telefono (unico por negocio) 
+fecha_registro TIMESTAMPTZ Primera vez que agendo cita 
+ 
+Cita 
+Campo Tipo Descripcion 
+id_cita SERIAL PK Identificador unico de la cita 
+id_negocio INT FK Negocio al que pertenece (multi-tenant) 
+id_cliente INT FK Cliente que agendo la cita 
+id_barbero INT FK NULLABLE Barbero asignado 
+servicio VARCHAR(100) Nombre del servicio solicitado 
+fecha_hora TIMESTAMPTZ Fecha y hora de la cita 
+duracion_min INT Duracion estimada en minutos 
+estado ENUM agendada, confirmada, llegada, en_servicio, 
+completada, cancelada, no_asistio 
+canal_origen ENUM whatsapp, web, manual 
+hora_llegada TIMESTAMPTZ Hora real de llegada del cliente 
+hora_inicio TIMESTAMPTZ Hora de inicio del servicio 
+hora_fin TIMESTAMPTZ Hora de finalizacion del servicio 
+precio_pagado DECIMAL(8,2) Monto cobrado por el servicio 
+fecha_creacion TIMESTAMPTZ Cuando se registro la cita 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+--- PAGE 16 ---
+Lista de espera 
+Campo Tipo Descripcion 
+id_espera SERIAL PK Identificador unico del registro 
+id_negocio INT FK Negocio al que corresponde 
+id_cliente INT FK Cliente en espera 
+fecha_hora_deseada TIMESTAMPTZ Horario que el cliente queria 
+servicio VARCHAR(100) Servicio solicitado 
+notificado BOOLEAN Si ya se notifico al cliente de disponibilidad 
+fecha_registro TIMESTAMPTZ Cuando se agrego a la lista 
+ 
+ 
+ 
+6. Modulos del Sistema  
+ 
+ID Modulo Estado Descripcion 
+MOD-
+01 
+Autenticacion y roles V2.0 JWT propio + bcrypt. Roles Administrador 
+y Barbero con permisos diferenciados. 
+MOD-
+02 
+Agendado — WhatsApp V2.0 Baileys + Groq API (Llama 3.1). Flujo 
+conversacional en maximo 5 mensajes. 
+MOD-
+03 
+Agendado — Web V2.0 Next.js en Vercel. Calendario dinamico 
+con disponibilidad en tiempo real. 
+MOD-
+04 
+Motor de tiempos V2.0 Bull Queue + Upstash Redis. Jobs para 
+tolerancia 10min, recordatorios 24h y 
+calculo de retrasos. 
+MOD-
+05 
+Dashboard operativo V2.0 Socket.io para actualizacion en tiempo 
+real. Acciones rapidas y registro de walk-
+in. 
+MOD-
+06 
+Gestion de clientes V2.0 Registro automatico por telefono. Historial 
+de citas por cliente con estadisticas. 
+MOD-
+07 
+Notificaciones V2.0 Recordatorio 24h, confirmacion de 
+asistencia, aviso de espera y mensaje de 
+agradecimiento. 
+MOD-
+08 
+Reportes V2.0 Datos reales de BD. Citas por periodo, 
+puntualidad y servicios populares. 
+MOD-
+09 
+Multi-tenant V2.0 Aislamiento de datos por id_negocio en 
+todos los queries. Onboarding de nueva 
+barberia. 
+MOD-
+10 
+Configuracion de servicios V3.0 — 
+Pendiente 
+El negocio configura servicios, duraciones 
+y precios desde el dashboard. 
+
+--- PAGE 17 ---
+ID Modulo Estado Descripcion 
+MOD-
+11 
+Asignacion de barbero V3.0 — 
+Pendiente 
+Modos: cliente elige, automatico o 
+combinado. 
+MOD-
+12 
+Migracion a APIs de pago V3.0 — 
+Pendiente 
+Meta Cloud API para WhatsApp y Claude 
+API para IA cuando los ingresos del SaaS 
+lo justifiquen. 
+ 
+  
+
+--- PAGE 18 ---
+7. Stack Tecnologico — Fase V2.0 Gratuito 
+ 
+Componente Tecnologia Justificacion 
+WhatsApp Baileys (Node.js open 
+source) 
+Gratis. Conecta via sesion activa. Ideal para 
+fase piloto con pocas barberias. 
+Agente IA Groq API — Llama 3.1 Gratis con limite generoso. Velocidad de 
+inferencia muy alta. Buen espanol. 
+Backend Node.js + Express Alto rendimiento para I/O. Ecosistema 
+robusto con Bull, Socket.io y Baileys. 
+Servidor backend Oracle Cloud Free Tier 2 VMs de 1GB RAM gratis permanentes. 
+Suficiente para fase de validacion. 
+Base de datos Supabase — PostgreSQL 500MB gratis. SDK para Node.js. Incluye 
+autenticacion y API REST opcionales. 
+Cache y jobs Upstash Redis + Bull Queue 10,000 comandos/dia gratis. Bull gestiona 
+jobs con reintentos y delays precisos. 
+Frontend y dashboard Next.js + Tailwind CSS SSR para SEO en pagina cliente. Deploy 
+gratis en Vercel. 
+Tiempo real Socket.io Open source. Actualizacion instantanea del 
+dashboard sin polling. 
+Autenticacion JWT + bcrypt Sin dependencia externa. JWT incluye 
+id_negocio para multi-tenant. 
+Deploy frontend Vercel Gratis para Next.js. CDN global incluida. 
+ 
+  
+
+--- PAGE 19 ---
+8. Roadmap de Versiones 
+ 
+Version Enfoque Incluye 
+V1.0 — 
+Prototipo 
+Validacion visual Interfaces React, datos en memoria, sin backend real. 
+Completado. 
+V2.0 — MVP Stack gratuito completo Backend Node.js, Supabase, Upstash, Baileys, Groq API, 
+Socket.io, multi-tenant. 
+V3.0 — 
+Crecimiento 
+Configuracion avanzada Servicios/precios configurables, asignacion de barbero, 
+calificaciones, migracion a Meta Cloud API y Claude API. 
+V4.0 — 
+Expansion 
+Nuevos giros Salones de belleza, consultorios, talleres. Multiples 
+sucursales. Pagos en linea. 
+ 
+  
+
+--- PAGE 20 ---
+9. Elementos Pendientes para Versiones Futuras  
+ 
+ID Elemento Version 
+PEN-
+01 
+Configuracion de servicios y precios desde dashboard V3.0 
+PEN-
+02 
+Modos de asignacion de barbero (manual, automatico, combinado) V3.0 
+PEN-
+03 
+Calificacion del servicio al finalizar la cita V3.0 
+PEN-
+04 
+Migracion de Baileys a Meta Cloud API oficial V3.0 
+PEN-
+05 
+Migracion de Groq API a Claude API para mayor calidad de NLP V3.0 
+PEN-
+06 
+Expansion a otros giros: salones, consultorios, talleres V4.0 
+PEN-
+07 
+Integracion de pagos en linea V4.0 
+PEN-
+08 
+Gestion de multiples sucursales por negocio V4.0 
+ 

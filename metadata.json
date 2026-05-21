@@ -1,0 +1,6 @@
+{
+  "name": "AgendaBarber",
+  "description": "Sistema SaaS de gestión de citas para barberías, diseñado con los estándares del Apple Human Interface Guidelines.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

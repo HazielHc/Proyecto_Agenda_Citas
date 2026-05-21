@@ -1,0 +1,127 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Plan {
+  basico
+  profesional
+  premium
+}
+
+enum Role {
+  administrador
+  barbero
+}
+
+enum AppointmentStatus {
+  agendada
+  confirmada
+  llegada
+  en_servicio
+  completada
+  cancelada
+  no_asistio
+}
+
+enum AppointmentChannel {
+  whatsapp
+  web
+  manual
+}
+
+model Business {
+  id              Int       @id @default(autoincrement()) @map("id_negocio")
+  name            String    @map("nombre") @db.VarChar(100)
+  email           String    @unique @map("correo") @db.VarChar(150)
+  passwordHash    String    @map("contrasena_hash") @db.VarChar(255)
+  plan            Plan
+  whatsappSession String?   @map("whatsapp_session")
+  active          Boolean   @default(true) @map("activo")
+  createdAt       DateTime  @default(now()) @map("fecha_registro") @db.Timestamptz(6)
+
+  barbers         Barber[]
+  clients         Client[]
+  appointments    Appointment[]
+  waitlistEntries WaitlistEntry[]
+
+  @@map("negocios")
+}
+
+model Barber {
+  id           Int      @id @default(autoincrement()) @map("id_barbero")
+  businessId   Int      @map("id_negocio")
+  firstName    String   @map("nombre") @db.VarChar(100)
+  lastName     String   @map("apellido") @db.VarChar(100)
+  role         Role
+  email        String   @db.VarChar(150)
+  passwordHash String   @map("contrasena_hash") @db.VarChar(255)
+  active       Boolean  @default(true) @map("activo")
+
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+
+  @@unique([businessId, email])
+  @@map("barberos")
+}
+
+model Client {
+  id        Int      @id @default(autoincrement()) @map("id_cliente")
+  businessId Int     @map("id_negocio")
+  firstName String   @map("nombre") @db.VarChar(100)
+  lastName  String   @map("apellido") @db.VarChar(100)
+  phone     String   @map("telefono") @db.VarChar(20)
+  createdAt DateTime @default(now()) @map("fecha_registro") @db.Timestamptz(6)
+
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  appointments    Appointment[]
+  waitlistEntries WaitlistEntry[]
+
+  @@unique([businessId, phone])
+  @@map("clientes")
+}
+
+model Appointment {
+  id          Int                @id @default(autoincrement()) @map("id_cita")
+  businessId  Int                @map("id_negocio")
+  clientId    Int                @map("id_cliente")
+  barberId    Int?               @map("id_barbero")
+  service     String             @map("servicio") @db.VarChar(100)
+  scheduledAt DateTime           @map("fecha_hora") @db.Timestamptz(6)
+  durationMin Int                @map("duracion_min")
+  status      AppointmentStatus  @default(agendada) @map("estado")
+  channel     AppointmentChannel @map("canal_origen")
+  arrivedAt   DateTime?          @map("hora_llegada") @db.Timestamptz(6)
+  startedAt   DateTime?          @map("hora_inicio") @db.Timestamptz(6)
+  finishedAt  DateTime?          @map("hora_fin") @db.Timestamptz(6)
+  pricePaid   Decimal?           @map("precio_pagado") @db.Decimal(8, 2)
+  createdAt   DateTime           @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  barber   Barber?  @relation(fields: [barberId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, scheduledAt])
+  @@index([businessId, status])
+  @@map("citas")
+}
+
+model WaitlistEntry {
+  id                 Int      @id @default(autoincrement()) @map("id_espera")
+  businessId         Int      @map("id_negocio")
+  clientId           Int      @map("id_cliente")
+  desiredScheduledAt DateTime @map("fecha_hora_deseada") @db.Timestamptz(6)
+  service            String   @map("servicio") @db.VarChar(100)
+  notified           Boolean  @default(false) @map("notificado")
+  createdAt          DateTime @default(now()) @map("fecha_registro") @db.Timestamptz(6)
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, desiredScheduledAt])
+  @@map("lista_espera")
+}
