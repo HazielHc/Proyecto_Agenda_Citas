@@ -10,6 +10,8 @@ import {
   verifyToken
 } from './auth';
 import { dbStatusToUi, getServiceById, services, splitDateTime, toScheduledAt, uiStatusToDb } from './mappers';
+import { processWhatsAppMessage } from './gemini';
+import { connectToWhatsApp } from './whatsapp';
 
 dotenv.config();
 
@@ -552,6 +554,19 @@ app.get('/api/reports/summary', requireAuth, requireAdmin, async (req, res, next
   }
 });
 
+app.post('/api/webhook/whatsapp', async (req, res, next) => {
+  try {
+    const { phone, message } = req.body;
+    if (!phone || !message) {
+      return res.status(400).json({ error: 'phone and message are required' });
+    }
+    const reply = await processWhatsAppMessage(phone, message, 1);
+    return res.json({ reply });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 app.use((error: any, _req: Request, res: Response, _next: NextFunction) => {
   const status = error.statusCode || 500;
   const message = status === 500 ? 'Unexpected server error' : error.message;
@@ -563,4 +578,6 @@ app.use((error: any, _req: Request, res: Response, _next: NextFunction) => {
 
 app.listen(port, () => {
   console.log(`AgendaBarber API listening on http://localhost:${port}/api`);
+  // Inicializar cliente de WhatsApp físico (Baileys)
+  connectToWhatsApp();
 });

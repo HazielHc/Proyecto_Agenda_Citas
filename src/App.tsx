@@ -7,7 +7,7 @@ import BusinessOnboarding from './components/BusinessOnboarding';
 import DailyAgenda from './components/DailyAgenda';
 import ClientsList from './components/ClientsList';
 import ReportsDashboard from './components/ReportsDashboard';
-import { BarChart3, Calendar, LogOut, Scissors, Users } from 'lucide-react';
+import { BarChart3, Calendar, LogOut, MessageSquare, Scissors, Users } from 'lucide-react';
 import {
   cancelPublicAppointment,
   clearStoredToken,
@@ -21,6 +21,7 @@ import {
   registerBusiness,
   updateAppointmentStatus
 } from './api';
+import WhatsAppSimulator from './components/WhatsAppSimulator';
 
 type DashboardView = 'agenda' | 'clients' | 'reports';
 
@@ -37,6 +38,7 @@ export default function App() {
   const isPublicBooking = path.startsWith('/book');
   const isPublicCancellation = path.startsWith('/cancel');
   const isRegistration = path.startsWith('/register');
+  const isChatSimulator = path.startsWith('/chat');
 
   const loadAppointments = async () => {
     const result = await fetchAppointments();
@@ -129,6 +131,14 @@ export default function App() {
       .finally(() => setIsBooting(false));
   }, []);
 
+  if (isChatSimulator) {
+    return (
+      <main className="min-h-screen bg-[#F5F5F7] p-4 md:p-8 flex items-center justify-center">
+        <WhatsAppSimulator />
+      </main>
+    );
+  }
+
   if (isPublicBooking) {
     return (
       <main className="min-h-screen bg-[#F5F5F7] p-4 md:p-8 flex items-center justify-center">
@@ -204,6 +214,16 @@ export default function App() {
             <Calendar className="w-4.5 h-4.5" />
             <span>Agenda</span>
           </button>
+
+          <a
+            href="/chat"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 px-3.5 py-2.5 text-xs font-semibold rounded-lg transition-all shrink-0 text-[#6E6E73] hover:text-[#1D1D1F] hover:bg-[#F5F5F7]"
+          >
+            <MessageSquare className="w-4.5 h-4.5 text-[#25D366]" />
+            <span>Simulador Bot WA</span>
+          </a>
 
           <button
             disabled={activeUserRole === 'Barbero / Recepcionista'}

@@ -125,3 +125,10 @@ export async function cancelPublicAppointment(id: string, phone: string) {
     body: JSON.stringify({ phone })
   });
 }
+
+export async function sendWhatsAppMessage(phone: string, message: string) {
+  return request<{ reply: string }>('/webhook/whatsapp', {
+    method: 'POST',
+    body: JSON.stringify({ phone, message })
+  });
+}

@@ -21,6 +21,7 @@ model Business {
   clients         Client[]
   appointments    Appointment[]
   waitlistEntries WaitlistEntry[]
+  chatSessions    ChatSession[]
 
   @@map("negocios")
 }
@@ -97,4 +98,16 @@ model WaitlistEntry {
 
   @@index([businessId, desiredScheduledAt])
   @@map("lista_espera")
+}
+
+model ChatSession {
+  id         Int      @id @default(autoincrement()) @map("id_sesion")
+  phone      String   @unique @map("telefono")
+  history    String   @map("historial_conversacion")
+  updatedAt  DateTime @updatedAt @map("ultima_actualizacion")
+  businessId Int      @map("id_negocio")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("sesiones_chat")
 }
