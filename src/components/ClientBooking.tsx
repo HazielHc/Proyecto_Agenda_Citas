@@ -4,13 +4,22 @@ import { Service, Appointment } from '../types';
 import { sampleServices, formatDateInSpanish } from '../data';
 
 interface ClientBookingProps {
-  onAddAppointment: (apt: Appointment) => void;
+  onAddAppointment: (apt: Appointment) => void | Promise<Appointment | void>;
   appointments: Appointment[];
+  businessName?: string;
 }
 
-export default function ClientBooking({ onAddAppointment, appointments }: ClientBookingProps) {
+export default function ClientBooking({ onAddAppointment, appointments, businessName = 'AgendaBarber' }: ClientBookingProps) {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const monthLabel = new Intl.DateTimeFormat('es-MX', {
+    month: 'long',
+    year: 'numeric'
+  }).format(new Date(currentYear, currentMonth, 1));
+  const datePrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
   const [selectedServiceId, setSelectedServiceId] = useState<string>(sampleServices[0].id);
-  const [selectedDay, setSelectedDay] = useState<number>(20); // Default to today 20
+  const [selectedDay, setSelectedDay] = useState<number>(now.getDate());
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -19,27 +28,20 @@ export default function ClientBooking({ onAddAppointment, appointments }: Client
   const [confirmedApt, setConfirmedApt] = useState<Appointment | null>(null);
   const [errorText, setErrorText] = useState<string | null>(null);
 
-  // Calendar setup for May 2026
-  // May 1st 2026 is a Friday.
-  // We'll generate a grid of 31 days.
-  const totalDays = 31;
-  const firstDayIndex = 5; // Friday (0 = Sun, 1 = Mon, ..., 5 = Fri)
-
-  // Some days are unavailable for simulation
-  const unavailableDays = [3, 10, 17, 24, 31, 2, 9, 16]; // Sundays and Saturdays
+  const totalDays = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const firstDayIndex = (new Date(currentYear, currentMonth, 1).getDay() + 6) % 7;
 
   // Slots for the selected day
   const timeSlots = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:30', '16:30', '17:30'];
 
   const isTimeOccupied = (time: string, dayNum: number) => {
-    // Check if there is an active appointment at that time on 2026-05-[dayNum]
-    const dateStr = `2026-05-${dayNum.toString().padStart(2, '0')}`;
+    const dateStr = `${datePrefix}-${dayNum.toString().padStart(2, '0')}`;
     return appointments.some(
       (a) => a.date === dateStr && a.time === time && a.status !== 'Cancelada'
     );
   };
 
-  const handleBook = (e: FormEvent) => {
+  const handleBook = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedServiceId || !selectedDay || !selectedTime || !firstName || !lastName || !phone) {
       setErrorText('Por favor complete todos los campos, seleccione fecha, hora y servicio.');
@@ -47,7 +49,7 @@ export default function ClientBooking({ onAddAppointment, appointments }: Client
     }
 
     setErrorText(null);
-    const dateStr = `2026-05-${selectedDay.toString().padStart(2, '0')}`;
+    const dateStr = `${datePrefix}-${selectedDay.toString().padStart(2, '0')}`;
     const newApt: Appointment = {
       id: `apt-user-${Date.now()}`,
       clientName: firstName,
@@ -56,14 +58,19 @@ export default function ClientBooking({ onAddAppointment, appointments }: Client
       serviceId: selectedServiceId,
       date: dateStr,
       time: selectedTime,
-      barber: 'Carlos Mendoza', // Default assigned barber
+      barber: 'Sin asignar',
       status: 'Agendada',
       pricePaid: selectedServiceId === '1' ? 180 : selectedServiceId === '2' ? 250 : selectedServiceId === '3' ? 150 : 200
     };
 
-    onAddAppointment(newApt);
-    setConfirmedApt(newApt);
-    setIsConfirmed(true);
+    try {
+      const savedAppointment = await onAddAppointment(newApt);
+      setConfirmedApt(savedAppointment || newApt);
+      setIsConfirmed(true);
+    } catch (error) {
+      setErrorText(error instanceof Error ? error.message : 'No se pudo registrar la cita.');
+      return;
+    }
 
     // Reset inputs
     setFirstName('');
@@ -92,7 +99,7 @@ export default function ClientBooking({ onAddAppointment, appointments }: Client
         <div className="bg-[#F5F5F7] rounded-lg p-5 text-left border border-[#E5E5EA] mb-8 space-y-3">
           <div className="flex justify-between border-b border-[#E5E5EA] pb-2">
             <span className="text-xs text-[#6E6E73]">Negocio</span>
-            <span className="text-xs font-medium text-[#1D1D1F]">Barbería El Navajero</span>
+            <span className="text-xs font-medium text-[#1D1D1F]">{businessName}</span>
           </div>
           <div className="flex justify-between border-b border-[#E5E5EA] pb-2">
             <span className="text-xs text-[#6E6E73]">Servicio</span>
@@ -135,7 +142,7 @@ export default function ClientBooking({ onAddAppointment, appointments }: Client
             PÁGINA WEB DE CLIENTES
           </p>
           <h1 className="text-2xl font-medium text-[#1D1D1F] tracking-tight">
-            Barbería El Navajero
+            {businessName}
           </h1>
           <p className="text-sm text-[#6E6E73] mt-1">
             Reserve su cita de forma ágil y segura en solo unos pasos.
@@ -193,7 +200,7 @@ export default function ClientBooking({ onAddAppointment, appointments }: Client
           </h3>
           <div className="border border-[#E5E5EA] rounded-lg p-4 bg-white">
             <div className="text-center font-medium text-xs text-[#1D1D1F] mb-3">
-              Mayo de 2026
+              {monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
             </div>
             
             {/* Days indices */}
@@ -216,7 +223,9 @@ export default function ClientBooking({ onAddAppointment, appointments }: Client
               {/* Day slots */}
               {Array.from({ length: totalDays }).map((_, i) => {
                 const dayNum = i + 1;
-                const isUnavailable = unavailableDays.includes(dayNum);
+                const dayOfWeek = new Date(currentYear, currentMonth, dayNum).getDay();
+                const isPast = dayNum < now.getDate();
+                const isUnavailable = dayOfWeek === 0 || dayOfWeek === 6 || isPast;
                 const isSelected = selectedDay === dayNum;
 
                 return (
@@ -253,7 +262,7 @@ export default function ClientBooking({ onAddAppointment, appointments }: Client
             Horario disponible
           </h3>
           <p className="text-xs text-[#6E6E73] pl-7 mb-3">
-            Mostrando horarios para el día {selectedDay} de Mayo, 2026
+            Mostrando horarios para {formatDateInSpanish(`${datePrefix}-${selectedDay.toString().padStart(2, '0')}`)}
           </p>
 
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -311,7 +320,7 @@ export default function ClientBooking({ onAddAppointment, appointments }: Client
               <div className="flex justify-between border-t border-[#E5E5EA] pt-2 mt-2">
                 <span className="text-[#6E6E73]">Fecha</span>
                 <span className="font-medium text-[#1D1D1F]">
-                  {formatDateInSpanish(`2026-05-${selectedDay.toString().padStart(2, '0')}`)}
+                  {formatDateInSpanish(`${datePrefix}-${selectedDay.toString().padStart(2, '0')}`)}
                 </span>
               </div>
               <div className="flex justify-between">

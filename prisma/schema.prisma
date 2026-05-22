@@ -1,5 +1,5 @@
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -7,42 +7,15 @@ generator client {
   provider = "prisma-client-js"
 }
 
-enum Plan {
-  basico
-  profesional
-  premium
-}
-
-enum Role {
-  administrador
-  barbero
-}
-
-enum AppointmentStatus {
-  agendada
-  confirmada
-  llegada
-  en_servicio
-  completada
-  cancelada
-  no_asistio
-}
-
-enum AppointmentChannel {
-  whatsapp
-  web
-  manual
-}
-
 model Business {
   id              Int       @id @default(autoincrement()) @map("id_negocio")
-  name            String    @map("nombre") @db.VarChar(100)
-  email           String    @unique @map("correo") @db.VarChar(150)
-  passwordHash    String    @map("contrasena_hash") @db.VarChar(255)
-  plan            Plan
+  name            String    @map("nombre")
+  email           String    @unique @map("correo")
+  passwordHash    String    @map("contrasena_hash")
+  plan            String    @default("profesional")
   whatsappSession String?   @map("whatsapp_session")
   active          Boolean   @default(true) @map("activo")
-  createdAt       DateTime  @default(now()) @map("fecha_registro") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("fecha_registro")
 
   barbers         Barber[]
   clients         Client[]
@@ -55,11 +28,11 @@ model Business {
 model Barber {
   id           Int      @id @default(autoincrement()) @map("id_barbero")
   businessId   Int      @map("id_negocio")
-  firstName    String   @map("nombre") @db.VarChar(100)
-  lastName     String   @map("apellido") @db.VarChar(100)
-  role         Role
-  email        String   @db.VarChar(150)
-  passwordHash String   @map("contrasena_hash") @db.VarChar(255)
+  firstName    String   @map("nombre")
+  lastName     String   @map("apellido")
+  role         String   @default("barbero")
+  email        String
+  passwordHash String   @map("contrasena_hash")
   active       Boolean  @default(true) @map("activo")
 
   business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
@@ -72,10 +45,10 @@ model Barber {
 model Client {
   id        Int      @id @default(autoincrement()) @map("id_cliente")
   businessId Int     @map("id_negocio")
-  firstName String   @map("nombre") @db.VarChar(100)
-  lastName  String   @map("apellido") @db.VarChar(100)
-  phone     String   @map("telefono") @db.VarChar(20)
-  createdAt DateTime @default(now()) @map("fecha_registro") @db.Timestamptz(6)
+  firstName String   @map("nombre")
+  lastName  String   @map("apellido")
+  phone     String   @map("telefono")
+  createdAt DateTime @default(now()) @map("fecha_registro")
 
   business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   appointments    Appointment[]
@@ -86,20 +59,20 @@ model Client {
 }
 
 model Appointment {
-  id          Int                @id @default(autoincrement()) @map("id_cita")
-  businessId  Int                @map("id_negocio")
-  clientId    Int                @map("id_cliente")
-  barberId    Int?               @map("id_barbero")
-  service     String             @map("servicio") @db.VarChar(100)
-  scheduledAt DateTime           @map("fecha_hora") @db.Timestamptz(6)
-  durationMin Int                @map("duracion_min")
-  status      AppointmentStatus  @default(agendada) @map("estado")
-  channel     AppointmentChannel @map("canal_origen")
-  arrivedAt   DateTime?          @map("hora_llegada") @db.Timestamptz(6)
-  startedAt   DateTime?          @map("hora_inicio") @db.Timestamptz(6)
-  finishedAt  DateTime?          @map("hora_fin") @db.Timestamptz(6)
-  pricePaid   Decimal?           @map("precio_pagado") @db.Decimal(8, 2)
-  createdAt   DateTime           @default(now()) @map("fecha_creacion") @db.Timestamptz(6)
+  id          Int       @id @default(autoincrement()) @map("id_cita")
+  businessId  Int       @map("id_negocio")
+  clientId    Int       @map("id_cliente")
+  barberId    Int?      @map("id_barbero")
+  service     String    @map("servicio")
+  scheduledAt DateTime  @map("fecha_hora")
+  durationMin Int       @map("duracion_min")
+  status      String    @default("agendada") @map("estado")
+  channel     String    @default("web") @map("canal_origen")
+  arrivedAt   DateTime? @map("hora_llegada")
+  startedAt   DateTime? @map("hora_inicio")
+  finishedAt  DateTime? @map("hora_fin")
+  pricePaid   Decimal?  @map("precio_pagado")
+  createdAt   DateTime  @default(now()) @map("fecha_creacion")
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
@@ -114,10 +87,10 @@ model WaitlistEntry {
   id                 Int      @id @default(autoincrement()) @map("id_espera")
   businessId         Int      @map("id_negocio")
   clientId           Int      @map("id_cliente")
-  desiredScheduledAt DateTime @map("fecha_hora_deseada") @db.Timestamptz(6)
-  service            String   @map("servicio") @db.VarChar(100)
+  desiredScheduledAt DateTime @map("fecha_hora_deseada")
+  service            String   @map("servicio")
   notified           Boolean  @default(false) @map("notificado")
-  createdAt          DateTime @default(now()) @map("fecha_registro") @db.Timestamptz(6)
+  createdAt          DateTime @default(now()) @map("fecha_registro")
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)

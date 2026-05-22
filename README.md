@@ -1,6 +1,13 @@
 # AgendaBarber
 
-Prototipo migrando hacia el MVP V2 descrito en el SRS: SaaS multi-tenant para barberias con agenda web, dashboard operativo y base preparada para WhatsApp/IA.
+Sistema SaaS para gestion de citas de barberias. Incluye panel privado del negocio, agendado publico, cancelacion publica con validacion por telefono, autenticacion y persistencia con PostgreSQL mediante Prisma.
+
+## Rutas
+
+- `/` Panel operativo del negocio
+- `/book` Pagina publica para agendar citas
+- `/cancel` Pagina publica para cancelar citas
+- `/register` Registro inicial de negocio
 
 ## Requisitos
 
@@ -19,6 +26,14 @@ JWT_SECRET="change-this-secret-before-deploy"
 JWT_EXPIRES_IN_SECONDS="28800"
 ```
 
+Para crear un negocio inicial por consola puedes definir temporalmente:
+
+```env
+SEED_BUSINESS_NAME="Nombre de la barberia"
+SEED_ADMIN_EMAIL="admin@negocio.com"
+SEED_ADMIN_PASSWORD="una-contrasena-segura"
+```
+
 ## Desarrollo
 
 ```bash
@@ -29,22 +44,12 @@ npm run dev:api
 npm run dev
 ```
 
-Credenciales demo del seed:
+## Produccion
 
-- Administrador: `admin@barberia.com` / `admin12345`
-- Barbero: `barbero@barberia.com` / `barbero12345`
+1. Configura `DATABASE_URL` con Supabase/PostgreSQL.
+2. Ejecuta `npx prisma db push` o migraciones Prisma.
+3. Define un `JWT_SECRET` fuerte.
+4. Levanta el backend Express en el servidor.
+5. Despliega el frontend con `VITE_API_URL` apuntando al backend HTTPS.
 
-## Estado SRS
-
-Implementado como primera base V2:
-
-- Modelo Prisma multi-tenant con negocios, barberos, clientes, citas y lista de espera.
-- API Express inicial con autenticacion por token, registro/login, citas, clientes y reportes base.
-- Frontend conectado al API para login, carga de citas, creacion y cambio de estado.
-
-Pendiente para completar V2:
-
-- Socket.io para tiempo real.
-- BullMQ/Upstash para recordatorios, tolerancia y jobs.
-- Baileys + Groq para WhatsApp e IA.
-- Migraciones/deploy Supabase y Oracle/Vercel.
+Pendiente para completar todo el SRS V2: Socket.io, jobs con Redis/BullMQ, Baileys y Groq para WhatsApp/IA.

@@ -6,8 +6,8 @@ interface DashboardLoginProps {
 }
 
 export default function DashboardLogin({ onLoginSuccess }: DashboardLoginProps) {
-  const [email, setEmail] = useState('admin@barberia.com');
-  const [password, setPassword] = useState('admin12345');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -101,23 +101,6 @@ export default function DashboardLogin({ onLoginSuccess }: DashboardLoginProps) 
           <p className="text-xs text-[#FF3B30] text-center">{errorText}</p>
         )}
       </form>
-
-      {/* Role Tip Information Box */}
-      <div className="bg-[#F5F5F7] border border-[#E5E5EA] rounded-lg p-3 text-center space-y-1">
-        <p className="text-[10px] font-medium text-[#1D1D1F]">
-          Roles Disponibles para Pruebas:
-        </p>
-        <div className="text-[9px] text-[#6E6E73] space-y-0.5">
-          <p>
-            <span className="font-semibold text-[#1D1D1F]">Administrador:</span>{' '}
-            admin@barberia.com / admin12345
-          </p>
-          <p>
-            <span className="font-semibold text-[#1D1D1F]">Barbero / Recepcionista:</span>{' '}
-            barbero@barberia.com / barbero12345
-          </p>
-        </div>
-      </div>
     </div>
   );
 }

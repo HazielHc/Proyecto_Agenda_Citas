@@ -76,12 +76,47 @@ function toUiAppointment(appointment: any) {
   };
 }
 
+function toPublicAvailability(appointment: any) {
+  const uiAppointment = toUiAppointment(appointment);
+  return {
+    ...uiAppointment,
+    clientName: '',
+    clientLastName: '',
+    phone: ''
+  };
+}
+
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, service: 'AgendaBarber API' });
 });
 
 app.get('/api/services', (_req, res) => {
   res.json({ services });
+});
+
+async function getPublicBusiness() {
+  return prisma.business.findFirst({
+    where: { active: true },
+    orderBy: { createdAt: 'asc' }
+  });
+}
+
+app.get('/api/public/business', async (_req, res, next) => {
+  try {
+    const business = await getPublicBusiness();
+    return res.json({
+      business: business
+        ? {
+            id: business.id,
+            name: business.name,
+            plan: business.plan
+          }
+        : null,
+      services
+    });
+  } catch (error) {
+    return next(error);
+  }
 });
 
 app.post('/api/auth/register', async (req, res, next) => {
@@ -188,6 +223,61 @@ app.get('/api/appointments', requireAuth, async (req, res, next) => {
   }
 });
 
+app.get('/api/public/appointments/lookup', async (req, res, next) => {
+  try {
+    const business = await getPublicBusiness();
+    const phone = String(req.query.phone || '').replace(/\D/g, '');
+    if (!business || phone.length < 4) {
+      return res.json({ appointments: [] });
+    }
+
+    const appointments = await prisma.appointment.findMany({
+      where: {
+        businessId: business.id,
+        client: {
+          phone: { contains: phone.slice(-4) }
+        },
+        status: { in: ['agendada', 'confirmada'] }
+      },
+      include: { client: true, barber: true },
+      orderBy: { scheduledAt: 'asc' }
+    });
+
+    return res.json({ appointments: appointments.map(toPublicAvailability) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.get('/api/public/appointments', async (req, res, next) => {
+  try {
+    const business = await getPublicBusiness();
+    if (!business) {
+      return res.json({ appointments: [] });
+    }
+
+    const date = typeof req.query.date === 'string' ? req.query.date : undefined;
+    const where: any = { businessId: business.id };
+
+    if (date) {
+      where.scheduledAt = {
+        gte: new Date(`${date}T00:00:00.000Z`),
+        lt: new Date(`${date}T23:59:59.999Z`)
+      };
+    }
+
+    const appointments = await prisma.appointment.findMany({
+      where,
+      include: { client: true, barber: true },
+      orderBy: { scheduledAt: 'asc' }
+    });
+
+    return res.json({ appointments: appointments.map(toUiAppointment) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 app.post('/api/appointments', requireAuth, async (req, res, next) => {
   try {
     const {
@@ -257,6 +347,107 @@ app.post('/api/appointments', requireAuth, async (req, res, next) => {
     });
 
     return res.status(201).json({ appointment: toUiAppointment(appointment) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.post('/api/public/appointments', async (req, res, next) => {
+  try {
+    const business = await getPublicBusiness();
+    if (!business) {
+      return res.status(404).json({ error: 'No active business is configured' });
+    }
+
+    const { clientName, clientLastName, phone, serviceId, date, time } = req.body;
+    if (!clientName || !clientLastName || !phone || !serviceId || !date || !time) {
+      return res.status(400).json({ error: 'Missing appointment fields' });
+    }
+
+    const service = getServiceById(serviceId);
+    const scheduledAt = toScheduledAt(date, time);
+
+    const appointment = await prisma.$transaction(async (tx) => {
+      const overlap = await tx.appointment.findFirst({
+        where: {
+          businessId: business.id,
+          scheduledAt,
+          status: { notIn: ['cancelada', 'no_asistio'] }
+        }
+      });
+
+      if (overlap) {
+        throw Object.assign(new Error('Time slot is already reserved'), { statusCode: 409 });
+      }
+
+      const client = await tx.client.upsert({
+        where: {
+          businessId_phone: {
+            businessId: business.id,
+            phone
+          }
+        },
+        create: {
+          businessId: business.id,
+          firstName: clientName,
+          lastName: clientLastName,
+          phone
+        },
+        update: {
+          firstName: clientName,
+          lastName: clientLastName
+        }
+      });
+
+      return tx.appointment.create({
+        data: {
+          businessId: business.id,
+          clientId: client.id,
+          service: service.name,
+          scheduledAt,
+          durationMin: service.duration,
+          status: 'agendada',
+          channel: 'web',
+          pricePaid: service.price
+        },
+        include: { client: true, barber: true }
+      });
+    });
+
+    return res.status(201).json({ appointment: toUiAppointment(appointment) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.patch('/api/public/appointments/:id/cancel', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const phone = String(req.body.phone || '').replace(/\D/g, '');
+    if (!id || phone.length < 4) {
+      return res.status(400).json({ error: 'Appointment id and phone are required' });
+    }
+
+    const appointment = await prisma.appointment.findFirst({
+      where: { id },
+      include: { client: true, barber: true }
+    });
+
+    if (!appointment || !appointment.client.phone.replace(/\D/g, '').endsWith(phone.slice(-4))) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+
+    if (appointment.status !== 'agendada' && appointment.status !== 'confirmada') {
+      return res.status(409).json({ error: 'This appointment cannot be cancelled from the public page' });
+    }
+
+    const cancelled = await prisma.appointment.update({
+      where: { id },
+      data: { status: 'cancelada' },
+      include: { client: true, barber: true }
+    });
+
+    return res.json({ appointment: toUiAppointment(cancelled) });
   } catch (error) {
     return next(error);
   }

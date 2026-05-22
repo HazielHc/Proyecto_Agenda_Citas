@@ -77,6 +77,27 @@ export async function fetchAppointments(date?: string) {
   return request<{ appointments: Appointment[] }>(`/appointments${query}`);
 }
 
+export async function fetchPublicAppointments(date?: string) {
+  const query = date ? `?date=${encodeURIComponent(date)}` : '';
+  return request<{ appointments: Appointment[] }>(`/public/appointments${query}`, {
+    headers: {}
+  });
+}
+
+export async function lookupPublicAppointments(phone: string) {
+  return request<{ appointments: Appointment[] }>(
+    `/public/appointments/lookup?phone=${encodeURIComponent(phone)}`,
+    { headers: {} }
+  );
+}
+
+export async function fetchPublicBusiness() {
+  return request<{
+    business: { id: number; name: string; plan: string } | null;
+    services: Array<{ id: string; name: string; duration: number; price: number }>;
+  }>('/public/business', { headers: {} });
+}
+
 export async function createAppointment(appointment: Appointment, channel: 'web' | 'manual' = 'web') {
   return request<{ appointment: Appointment }>('/appointments', {
     method: 'POST',
@@ -84,9 +105,23 @@ export async function createAppointment(appointment: Appointment, channel: 'web'
   });
 }
 
+export async function createPublicAppointment(appointment: Appointment) {
+  return request<{ appointment: Appointment }>('/public/appointments', {
+    method: 'POST',
+    body: JSON.stringify({ ...appointment, channel: 'web' })
+  });
+}
+
 export async function updateAppointmentStatus(id: string, status: AppointmentStatus) {
   return request<{ appointment: Appointment }>(`/appointments/${id}/status`, {
     method: 'PATCH',
     body: JSON.stringify({ status })
+  });
+}
+
+export async function cancelPublicAppointment(id: string, phone: string) {
+  return request<{ appointment: Appointment }>(`/public/appointments/${id}/cancel`, {
+    method: 'PATCH',
+    body: JSON.stringify({ phone })
   });
 }

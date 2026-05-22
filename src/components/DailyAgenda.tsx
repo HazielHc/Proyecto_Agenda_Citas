@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { Appointment, AppointmentStatus } from '../types';
-import { sampleServices, sampleBarbers, formatDateInSpanish } from '../data';
+import { sampleServices, formatDateInSpanish } from '../data';
 import {
   Clock,
   Phone,
@@ -39,13 +39,11 @@ export default function DailyAgenda({
   const [walkInServiceId, setWalkInServiceId] = useState(sampleServices[0].id);
   const [errorText, setErrorText] = useState<string | null>(null);
 
-  // Filter appointments for today
-  const todayStr = '2026-05-20'; // Base date for simulation
+  const todayStr = new Date().toISOString().slice(0, 10);
   const todayAppointments = appointments
     .filter((a) => a.date === todayStr)
     .sort((a, b) => a.time.localeCompare(b.time));
 
-  // Live chronometers state (stores the live mock seconds elapsed for "En servicio" appointments)
   const [liveSeconds, setLiveSeconds] = useState<{ [id: string]: number }>({});
 
   useEffect(() => {
@@ -78,7 +76,7 @@ export default function DailyAgenda({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleWalkInSubmit = (e: FormEvent) => {
+  const handleWalkInSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!walkInFirstName || !walkInLastName) {
       setErrorText('Por favor complete el nombre y apellido.');
@@ -87,8 +85,6 @@ export default function DailyAgenda({
 
     setErrorText(null);
 
-    // Determine reasonable time slot based on current time or standard list
-    // Let's grab current time or simply make it "15:30" (or similar) or live hour
     const dateObj = new Date();
     const hours = dateObj.getHours().toString().padStart(2, '0');
     const minutes = dateObj.getMinutes().toString().padStart(2, '0');
@@ -102,12 +98,12 @@ export default function DailyAgenda({
       serviceId: walkInServiceId,
       date: todayStr,
       time: currentTimeStr,
-      barber: 'Héctor Ruiz', // Assign dynamically
-      status: 'Cliente llegó', // Starts at arrived for immediate service
+      barber: activeUserName || 'Personal en turno',
+      status: 'Cliente llegó',
       pricePaid: walkInServiceId === '1' ? 180 : walkInServiceId === '2' ? 250 : walkInServiceId === '3' ? 150 : 200
     };
 
-    onAddAppointment(newWalkIn);
+    await onAddAppointment(newWalkIn);
     
     // Clean up & Close modal
     setWalkInFirstName('');
@@ -165,12 +161,11 @@ export default function DailyAgenda({
     }
   };
 
-  // Available slots for direct walk-ins
-  const simulatedFreeSlots = [
-    { time: '12:00', label: 'Disponible — entrada directa' },
-    { time: '16:00', label: 'Disponible — entrada directa' },
-    { time: '18:00', label: 'Disponible — entrada directa' }
-  ];
+  const standardSlots = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:30', '16:30', '17:30'];
+  const freeSlots = standardSlots
+    .filter((time) => !todayAppointments.some((a) => a.time === time && a.status !== 'Cancelada' && a.status !== 'No asistió'))
+    .slice(0, 4)
+    .map((time) => ({ time, label: 'Disponible para entrada directa' }));
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6 pt-2">
@@ -238,7 +233,7 @@ export default function DailyAgenda({
                     <div className="flex gap-4 items-start">
                       <div className="w-16 text-right shrink-0">
                         <p className="text-sm font-semibold text-[#1D1D1F]">{apt.time} hs</p>
-                        <p className="text-[10px] text-[#6E6E73] uppercase">Mayo 20</p>
+                        <p className="text-[10px] text-[#6E6E73] uppercase">{apt.date.slice(5)}</p>
                       </div>
 
                       <div className="space-y-1">
@@ -345,8 +340,7 @@ export default function DailyAgenda({
             </div>
 
             <div className="space-y-2">
-              {simulatedFreeSlots.map((slot) => {
-                // If the hour already has an appointment, hide/strike-through
+              {freeSlots.map((slot) => {
                 const isOccupied = todayAppointments.some((a) => a.time === slot.time && a.status !== 'Cancelada');
 
                 return (

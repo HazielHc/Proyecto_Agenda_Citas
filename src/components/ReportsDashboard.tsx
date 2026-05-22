@@ -27,14 +27,11 @@ export default function ReportsDashboard({ appointments }: ReportsDashboardProps
   const totalCanceled = appointments.filter((a) => a.status === 'Cancelada').length;
   const totalNoShow = appointments.filter((a) => a.status === 'No asistió').length;
 
-  // Period multipliers to simulate full data breadth
-  const mult = period === 'Día' ? 1 : period === 'Semana' ? 6 : 24;
-
   const stats = {
-    booked: totalBooked * mult,
-    completed: totalCompleted * mult,
-    canceled: totalCanceled * mult,
-    noShow: totalNoShow * mult
+    booked: totalBooked,
+    completed: totalCompleted,
+    canceled: totalCanceled,
+    noShow: totalNoShow
   };
 
   // Group services
@@ -46,28 +43,26 @@ export default function ReportsDashboard({ appointments }: ReportsDashboardProps
   const popularServices = sampleServices
     .map((s) => ({
       name: s.name,
-      count: (serviceCounts[s.id] || 0) * mult
+      count: serviceCounts[s.id] || 0
     }))
     .sort((a, b) => b.count - a.count);
 
-  // Simulated chart data values for Lun, Mar, Mié, Jue, Vie, Sáb, Dom
-  const chartValues = [
-    { day: 'Lun', bookings: Math.round(8 * (mult * 0.8)) },
-    { day: 'Mar', bookings: Math.round(12 * (mult * 1.0)) },
-    { day: 'Mié', bookings: Math.round(14 * (mult * 0.9)) },
-    { day: 'Jue', bookings: Math.round(15 * (mult * 1.1)) },
-    { day: 'Vie', bookings: Math.round(22 * (mult * 1.2)) },
-    { day: 'Sáb', bookings: Math.round(18 * (mult * 1.1)) },
-    { day: 'Dom', bookings: Math.round(2 * (mult * 0.4)) }
-  ];
+  const weekdays = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
+  const chartValues = weekdays.map((day) => ({ day, bookings: 0 }));
+  appointments.forEach((appointment) => {
+    const weekday = new Date(`${appointment.date}T00:00:00`).getDay();
+    chartValues[weekday].bookings += 1;
+  });
 
   const maxBookings = Math.max(...chartValues.map((v) => v.bookings)) || 1;
 
-  // Punctuality indicators
+  const completedRate = totalBooked > 0 ? Math.round((totalCompleted / totalBooked) * 100) : 0;
+  const canceledRate = totalBooked > 0 ? Math.round((totalCanceled / totalBooked) * 100) : 0;
+  const noShowRate = totalBooked > 0 ? Math.round((totalNoShow / totalBooked) * 100) : 0;
   const compliance = {
-    onTime: 85,
-    delayed: 10,
-    noShow: 5
+    onTime: completedRate,
+    delayed: canceledRate,
+    noShow: noShowRate
   };
 
   return (
@@ -222,7 +217,7 @@ export default function ReportsDashboard({ appointments }: ReportsDashboardProps
 
           <div className="space-y-3 pt-2">
             {popularServices.map((service, idx) => {
-              const percentages = totalBooked > 0 ? (service.count / (totalBooked * mult)) * 100 : 25;
+              const percentages = totalBooked > 0 ? (service.count / (Math.max(totalBooked, 1))) * 100 : 25;
               return (
                 <div key={service.name} className="space-y-1">
                   <div className="flex justify-between text-xs">

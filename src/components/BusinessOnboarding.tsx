@@ -3,7 +3,12 @@ import { samplePlans } from '../data';
 import { Check, ShieldAlert, Award, Star } from 'lucide-react';
 
 interface BusinessOnboardingProps {
-  onOnboardingComplete: (businessName: string, planId: string) => void;
+  onOnboardingComplete: (
+    businessName: string,
+    planId: string,
+    email: string,
+    password: string
+  ) => void | Promise<void>;
 }
 
 export default function BusinessOnboarding({ onOnboardingComplete }: BusinessOnboardingProps) {
@@ -14,6 +19,7 @@ export default function BusinessOnboarding({ onOnboardingComplete }: BusinessOnb
   const [selectedPlanId, setSelectedPlanId] = useState('profesional');
   const [success, setSuccess] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -30,8 +36,16 @@ export default function BusinessOnboarding({ onOnboardingComplete }: BusinessOnb
     setSuccess(true);
   };
 
-  const handleGoToApp = () => {
-    onOnboardingComplete(businessName || 'Barbería Registrada', selectedPlanId);
+  const handleGoToApp = async () => {
+    setIsSubmitting(true);
+    setErrorText(null);
+    try {
+      await onOnboardingComplete(businessName || 'Barberia Registrada', selectedPlanId, email, password);
+    } catch (error) {
+      setErrorText(error instanceof Error ? error.message : 'No se pudo registrar el negocio.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (success) {
@@ -66,10 +80,12 @@ export default function BusinessOnboarding({ onOnboardingComplete }: BusinessOnb
 
         <button
           onClick={handleGoToApp}
+          disabled={isSubmitting}
           className="w-full py-2.5 bg-[#0071E3] text-white hover:bg-[#005ebd] text-sm font-medium rounded-lg transition-colors cursor-pointer"
         >
-          Acceder al Panel de Control
+          {isSubmitting ? 'Creando cuenta...' : 'Acceder al Panel de Control'}
         </button>
+        {errorText && <p className="text-xs text-[#FF3B30]">{errorText}</p>}
       </div>
     );
   }
