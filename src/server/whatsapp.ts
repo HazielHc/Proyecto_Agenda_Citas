@@ -10,6 +10,31 @@ import { processWhatsAppMessage } from './gemini';
 
 const SESSION_DIR = process.env.WHATSAPP_SESSION_DIR || './storage/baileys';
 
+// Función auxiliar para extraer texto de las diferentes estructuras de mensaje de WhatsApp (incluyendo mensajes temporales)
+function getMessageText(message: any): string | null {
+  if (!message) return null;
+  if (message.conversation) return message.conversation;
+  if (message.extendedTextMessage?.text) return message.extendedTextMessage.text;
+  if (message.imageMessage?.caption) return message.imageMessage.caption;
+  if (message.videoMessage?.caption) return message.videoMessage.caption;
+  
+  // Desempaquetar envoltorios comunes de WhatsApp
+  if (message.ephemeralMessage?.message) {
+    return getMessageText(message.ephemeralMessage.message);
+  }
+  if (message.viewOnceMessage?.message) {
+    return getMessageText(message.viewOnceMessage.message);
+  }
+  if (message.viewOnceMessageV2?.message) {
+    return getMessageText(message.viewOnceMessageV2.message);
+  }
+  if (message.documentWithCaptionMessage?.message) {
+    return getMessageText(message.documentWithCaptionMessage.message);
+  }
+  
+  return null;
+}
+
 export async function connectToWhatsApp() {
   try {
     // Asegurar que la carpeta de almacenamiento existe
@@ -52,8 +77,10 @@ export async function connectToWhatsApp() {
           setTimeout(() => connectToWhatsApp(), 5000);
         }
       } else if (connection === 'open') {
+        const botNumber = sock.user?.id ? sock.user.id.split(':')[0] : 'Desconocido';
         console.log('==================================================');
         console.log('  ✅ ¡CONEXIÓN DE WHATSAPP ESTABLECIDA CON ÉXITO!  ');
+        console.log(`  Bot conectado con el número: ${botNumber}`);
         console.log('  Ya puedes enviar mensajes a este número para agendar.');
         console.log('==================================================');
       }
@@ -73,11 +100,14 @@ export async function connectToWhatsApp() {
         if (!remoteJid.endsWith('@s.whatsapp.net')) continue;
 
         const phone = remoteJid.split('@')[0];
-        const messageText = msg.message?.conversation || 
-                            msg.message?.extendedTextMessage?.text || 
-                            msg.message?.imageMessage?.caption;
+        const messageText = getMessageText(msg.message);
 
-        if (!phone || !messageText) continue;
+        if (!phone || !messageText) {
+          if (!phone) continue;
+          // Loggear para depuración si es un formato no soportado (como stickers, contactos, etc.)
+          console.log(`[WhatsApp recibido] Mensaje de tipo no soportado o vacío de ${phone}`);
+          continue;
+        }
 
         console.log(`[WhatsApp recibido] De: ${phone} | Mensaje: ${messageText}`);
 

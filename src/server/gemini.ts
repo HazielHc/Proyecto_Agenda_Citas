@@ -217,7 +217,7 @@ REGLAS DE CONVERSACIÓN:
   // LLamada a Gemini utilizando Structured Output
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       contents: [...history, userMessage],
       config: {
         systemInstruction,
